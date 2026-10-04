@@ -1,156 +1,190 @@
 import streamlit as st
 import random
 
-st.set_page_config(page_title="Kelime Avı", page_icon="🕹️", layout="centered")
+st.set_page_config(page_title="Adam Asmaca", page_icon="🕹️", layout="centered")
 
-# --- 1. ÖZEL STİL (DAHA ÖZGÜN ARAYÜZ) ---
+# --- 1. STİL AYARLARI ---
 st.markdown("""
 <style>
-    .word-card {
-        background: linear-gradient(135deg, #1e293b, #0f172a);
-        color: #f8fafc;
+    .game-card {
+        background-color: #0f172a;
+        border: 2px solid #3b82f6;
         border-radius: 16px;
-        padding: 24px;
+        padding: 20px;
         text-align: center;
-        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
         margin-bottom: 20px;
     }
-    .word-display {
-        font-family: 'Courier New', monospace;
+    .word-text {
+        font-family: monospace;
         font-size: 2.2rem;
-        letter-spacing: 8px;
-        font-weight: 700;
+        letter-spacing: 10px;
+        font-weight: bold;
         color: #38bdf8;
+        margin: 12px 0;
     }
-    .clue-tag {
+    .badge-ok {
+        background-color: #059669;
+        color: white;
+        padding: 4px 10px;
+        margin: 2px;
+        border-radius: 6px;
+        font-weight: bold;
         display: inline-block;
-        background-color: #334155;
-        color: #cbd5e1;
-        padding: 4px 14px;
-        border-radius: 20px;
-        font-size: 0.85rem;
-        margin-bottom: 12px;
+    }
+    .badge-no {
+        background-color: #4b5563;
+        color: #d1d5db;
+        padding: 4px 10px;
+        margin: 2px;
+        border-radius: 6px;
+        font-weight: bold;
+        text-decoration: line-through;
+        display: inline-block;
     }
 </style>
 """, unsafe_allow_html=True)
 
-# --- 2. BİRLEŞİK KELİME VE İPUCU HAVUZU ---
+# --- 2. HATA VERMEYEN DİNAMİK SVG ÇİZİMİ ---
+def cizim_svg(can):
+    parcalar = []
+    # Temel Direk ve Darağacı
+    parcalar.append('<line x1="20" y1="230" x2="100" y2="230" stroke="#94a3b8" stroke-width="5" stroke-linecap="round"/>')
+    parcalar.append('<line x1="50" y1="230" x2="50" y2="20" stroke="#94a3b8" stroke-width="5"/>')
+    parcalar.append('<line x1="50" y1="20" x2="150" y2="20" stroke="#94a3b8" stroke-width="5"/>')
+    parcalar.append('<line x1="50" y1="60" x2="90" y2="20" stroke="#94a3b8" stroke-width="4"/>')
+    parcalar.append('<line x1="150" y1="20" x2="150" y2="60" stroke="#cbd5e1" stroke-width="3" stroke-dasharray="2,2"/>')
+
+    # Can azaldıkça eklenen vücut parçaları
+    if can <= 5: # Kafa
+        parcalar.append('<circle cx="150" cy="80" r="20" stroke="#f87171" stroke-width="4" fill="none"/>')
+    if can <= 4: # Gövde
+        parcalar.append('<line x1="150" y1="100" x2="150" y2="160" stroke="#f87171" stroke-width="4"/>')
+    if can <= 3: # Sol Kol
+        parcalar.append('<line x1="150" y1="115" x2="120" y2="145" stroke="#f87171" stroke-width="4" stroke-linecap="round"/>')
+    if can <= 2: # Sağ Kol
+        parcalar.append('<line x1="150" y1="115" x2="180" y2="145" stroke="#f87171" stroke-width="4" stroke-linecap="round"/>')
+    if can <= 1: # Sol Bacak
+        parcalar.append('<line x1="150" y1="160" x2="125" y2="210" stroke="#f87171" stroke-width="4" stroke-linecap="round"/>')
+    if can <= 0: # Sağ Bacak
+        parcalar.append('<line x1="150" y1="160" x2="175" y2="210" stroke="#f87171" stroke-width="4" stroke-linecap="round"/>')
+
+    svg_govde = "".join(parcalar)
+    return f'<div style="display:flex; justify-content:center;"><svg width="200" height="240" viewBox="0 0 200 240">{svg_govde}</svg></div>'
+
+# --- 3. KELİME LİSTESİ ---
 TUM_KELIMELER = [
-    # Kimya & Fen
-    ("ATOM", "Kimya & Fen"),
-    ("MOLEKÜL", "Kimya & Fen"),
-    ("REAKTÖR", "Kimya & Fen"),
-    ("KATALİZÖR", "Kimya & Fen"),
-    ("ÇÖZELTİ", "Kimya & Fen"),
-    ("BASINÇ", "Kimya & Fen"),
-    ("ENERJİ", "Kimya & Fen"),
-    # Şehirler
-    ("İSTANBUL", "Coğrafya & Şehir"),
-    ("ANKARA", "Coğrafya & Şehir"),
-    ("İZMİR", "Coğrafya & Şehir"),
-    ("KOCAELİ", "Coğrafya & Şehir"),
-    ("ELAZIĞ", "Coğrafya & Şehir"),
-    ("BURSA", "Coğrafya & Şehir"),
-    # Yiyecek & Meyve
-    ("ŞEFTALİ", "Meyve"),
-    ("MANDALİNA", "Meyve"),
-    ("PORTAKAL", "Meyve"),
-    ("KARPUZ", "Meyve"),
-    ("KESTANE", "Atıştırmalık"),
-    # Kültür & Teknoloji
-    ("PUSULA", "Keşif & Alet"),
-    ("TEKNOLOJİ", "Bilişim"),
-    ("YAZILIM", "Bilişim"),
-    ("GEZEGEN", "Uzay & Astronomi"),
-    ("ROBOT", "Mühendislik"),
-    ("FELSEFE", "Sosyal Bilim"),
+    ("ATOM", "Kimya & Fizik"),
+    ("MOLEKÜL", "Kimya & Biyoloji"),
+    ("REAKTÖR", "Kimya Mühendisliği"),
+    ("KATALİZÖR", "Tepkime Hızlandırıcı"),
+    ("ÇÖZELTİ", "Homojen Karışım"),
+    ("İSTANBUL", "Boğazı Olan Şehir"),
+    ("ANKARA", "Başkent"),
+    ("İZMİR", "Ege Bölgesi"),
+    ("KOCAELİ", "Sanayi Şehri"),
+    ("ELAZIĞ", "Doğu Anadolu"),
+    ("PORTAKAL", "Kış Meyvesi"),
+    ("PUSULA", "Yön Gösterici"),
+    ("YAZILIM", "Kod Dünyası"),
+    ("GEZEGEN", "Gök Cismi")
 ]
 
-# --- 3. OYUN BAŞLATMA ---
+# --- 4. OYUN KURULUMU ---
 def yeni_oyun():
-    secim = random.choice(TUM_KELIMELER)
-    st.session_state.gizli_kelime = secim[0]
-    st.session_state.ipucu = secim[1]
+    secilen = random.choice(TUM_KELIMELER)
+    st.session_state.gizli_kelime = secilen[0]
+    st.session_state.ipucu = secilen[1]
     st.session_state.tahminler = []
     st.session_state.kalan_can = 6
-    st.session_state.durum = "oyun"  # "oyun", "kazandi", "kaybetti"
+    st.session_state.durum = "oyun"
 
 if "gizli_kelime" not in st.session_state:
     yeni_oyun()
 
-# --- 4. CAN VE KELİME KARTI ---
-kalpler = "❤️ " * st.session_state.kalan_can + "🖤 " * (6 - st.session_state.kalan_can)
+# --- 5. GÖRSEL ÇİZİM VE KART ---
+st.markdown(cizim_svg(st.session_state.kalan_can), unsafe_allow_html=True)
 
-# Görünecek harfleri hazırla
-gorunen_kelime = ""
-tamamlandi = True
+# Çizgileri ve harfleri hazırla
+gorunen = ""
+kazandi_mi = True
 for h in st.session_state.gizli_kelime:
     if h in st.session_state.tahminler:
-        gorunen_kelime += f"{h} "
+        gorunen += f"{h} "
     else:
-        gorunen_kelime += "_ "
-        tamamlandi = False
+        gorunen += "_ "
+        kazandi_mi = False
+
+kalpler = "❤️ " * st.session_state.kalan_can + "🖤 " * (6 - st.session_state.kalan_can)
 
 st.markdown(f"""
-<div class="word-card">
-    <div class="clue-tag">💡 İpucu: {st.session_state.ipucu}</div>
-    <div style="font-size: 1.2rem; margin-bottom: 15px;">{kalpler}</div>
-    <div class="word-display">{gorunen_kelime.strip()}</div>
+<div class="game-card">
+    <div style="color: #93c5fd; font-size: 0.95rem;">💡 <b>İpucu:</b> {st.session_state.ipucu}</div>
+    <div style="font-size: 1.1rem; margin: 8px 0;">{kalpler}</div>
+    <div class="word-text">{gorunen.strip()}</div>
 </div>
 """, unsafe_allow_html=True)
 
-# Kazanma / Kaybetme Tespiti
-if tamamlandi and st.session_state.durum == "oyun":
+# Kazanma ve Kaybetme Kontrolü
+if kazandi_mi and st.session_state.durum == "oyun":
     st.session_state.durum = "kazandi"
 elif st.session_state.kalan_can <= 0 and st.session_state.durum == "oyun":
     st.session_state.durum = "kaybetti"
 
-# --- 5. OYUN İÇİ ETKİLEŞİM ---
+# --- 6. GİRİŞ VE TAHMİN ALANI ---
 if st.session_state.durum == "oyun":
-    sekme1, sekme2 = st.tabs(["⌨️ Harf Tablası", "🎯 Direkt Tahmin"])
+    with st.form("tahmin_formu", clear_on_submit=True):
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            giris = st.text_input("Harf veya Kelime", placeholder="Harf veya tüm kelimeyi yaz...", label_visibility="collapsed")
+        with col2:
+            buton = st.form_submit_button("Tahmin Et 🚀", use_container_width=True)
 
-    # SEKME 1: BUTONLU KLAVYE
-    with sekme1:
-        alfabe = [
-            "A", "B", "C", "Ç", "D", "E", "F", "G", "Ğ", "H", "I", "İ", 
-            "J", "K", "L", "M", "N", "O", "Ö", "P", "R", "S", "Ş", "T", 
-            "U", "Ü", "V", "Y", "Z"
-        ]
-        
-        # Harfleri 6 sütunluk grid düzenine bölelim
-        cols = st.columns(6)
-        for i, harf in enumerate(alfabe):
-            with cols[i % 6]:
-                kullanildi = harf in st.session_state.tahminler
-                if st.button(harf, key=f"btn_{harf}", disabled=kullanildi, use_container_width=True):
-                    st.session_state.tahminler.append(harf)
-                    if harf not in st.session_state.gizli_kelime:
-                        st.session_state.kalan_can -= 1
-                    st.rerun()
+    if buton and giris:
+        # Türkçe karakterleri büyüterek alalım
+        giris_temiz = giris.strip().replace("i", "İ").replace("ı", "I").upper()
 
-    # SEKME 2: KELİME ÇÖZÜCÜ
-    with sekme2:
-        with st.form("direkt_tahmin", clear_on_submit=True):
-            tahmin_input = st.text_input("Aklındaki kelimeyi yaz:").strip().upper()
-            gonder = st.form_submit_button("Kelimeyi Kilitle 🔓", use_container_width=True)
+        # Tek harf girildiyse
+        if len(giris_temiz) == 1:
+            if giris_temiz in st.session_state.tahminler:
+                st.toast(f"'{giris_temiz}' zaten denendi!", icon="⚠️")
+            else:
+                st.session_state.tahminler.append(giris_temiz)
+                if giris_temiz not in st.session_state.gizli_kelime:
+                    st.session_state.kalan_can -= 1
+                    st.toast(f"'{giris_temiz}' harfi yok!", icon="❌")
+                else:
+                    st.toast(f"'{giris_temiz}' harfi doğru!", icon="✅")
+                st.rerun()
 
-        if gonder and tahmin_input:
-            if tahmin_input == st.session_state.gizli_kelime:
+        # Tüm kelime girildiyse
+        else:
+            if giris_temiz == st.session_state.gizli_kelime:
                 st.session_state.durum = "kazandi"
                 st.rerun()
             else:
                 st.session_state.kalan_can -= 2
-                st.toast(f"'{tahmin_input}' yanlış! 2 can kaybettin.", icon="⚠️")
+                st.toast(f"'{giris_temiz}' doğru kelime değil! 2 can gitti.", icon="⚠️")
                 st.rerun()
 
-# --- 6. OYUN SONU EKRANI ---
+# --- 7. KULLANILAN HARFLER ---
+if st.session_state.tahminler:
+    rozetler = ""
+    for h in st.session_state.tahminler:
+        if h in st.session_state.gizli_kelime:
+            rozetler += f'<span class="badge-ok">{h}</span>'
+        else:
+            rozetler += f'<span class="badge-no">{h}</span>'
+    
+    st.markdown(f"<div style='text-align:center;'>Denenenler:<br>{rozetler}</div>", unsafe_allow_html=True)
+
+# --- 8. OYUN SONU ---
 if st.session_state.durum == "kazandi":
     st.balloons()
-    st.success(f"🏆 Harika iş! Kelimeyi çözdün: **{st.session_state.gizli_kelime}**")
+    st.success(f"🎉 Tebrikler! Kelime: **{st.session_state.gizli_kelime}**")
 elif st.session_state.durum == "kaybetti":
-    st.error(f"💀 Maalesef kaybettin! Doğru kelime: **{st.session_state.gizli_kelime}**")
+    st.error(f"💀 Asıldın! Doğru kelime: **{st.session_state.gizli_kelime}**")
 
 if st.session_state.durum != "oyun":
-    if st.button("Sıradaki Kelimeye Geç ⏭️", use_container_width=True):
+    if st.button("Yeni Kelime 🔄", use_container_width=True):
         yeni_oyun()
         st.rerun()
